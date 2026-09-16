@@ -66,7 +66,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the full component breakd
 │   ├── observability/      # Grafana dashboard + datasource config
 │   └── slo/                # PrometheusRule: SLIs, SLOs, burn-rate alerts
 ├── .github/workflows/      # Terraform CI (validate/lint/security/plan)
-├── docs/                   # architecture, SLO, runbook
+├── docs/                   # architecture, SLO, runbook, capacity planning
 ├── scripts/                # helper scripts (state bootstrap, kubeconfig)
 └── Makefile                # single entrypoint for every workflow
 ```
@@ -110,6 +110,10 @@ Objectives, error budgets, and the reasoning behind the burn-rate thresholds liv
 ## Operating it
 
 [`docs/runbook.md`](docs/runbook.md) covers the on-call basics: how to read the golden signals, what each alert means, first-response steps for a latency or availability burn, how to drain and roll a node pool, and how to safely roll back a bad deploy.
+
+## Capacity planning
+
+[`docs/capacity-planning.md`](docs/capacity-planning.md) covers how to size the cluster correctly for your traffic, how to read saturation signals before they become incidents, the levers available (vertical SKU upgrades, node pool bounds, HPA ceilings), production sizing tiers, and a quarterly review checklist.
 
 ## Design decisions worth calling out
 
