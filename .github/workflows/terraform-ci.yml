@@ -30,6 +30,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/cache@v4
+        with:
+          path: terraform/.terraform
+          key: terraform-${{ hashFiles('terraform/.terraform.lock.hcl') }}
+          restore-keys: terraform-
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.9.8"
@@ -46,7 +52,7 @@ jobs:
       - name: tflint
         uses: terraform-linters/setup-tflint@v4
         with:
-          tflint_version: latest
+          tflint_version: v0.53.0
       - run: tflint --init && tflint --recursive
 
       - name: checkov (security scan)
@@ -66,6 +72,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/cache@v4
+        with:
+          path: terraform/.terraform
+          key: terraform-${{ hashFiles('terraform/.terraform.lock.hcl') }}
+          restore-keys: terraform-
+
       - uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -84,6 +96,13 @@ jobs:
         run: terraform plan -no-color -input=false -out=tfplan
         continue-on-error: true
 
+      - name: upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ github.event.pull_request.number }}
+          path: terraform/tfplan
+          retention-days: 3
+
       - name: comment plan on PR
         uses: actions/github-script@v7
         with:
@@ -99,3 +118,34 @@ jobs:
       - name: fail if plan errored
         if: steps.plan.outcome == 'failure'
         run: exit 1
+
+  apply:
+    name: apply
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: demo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: terraform/.terraform
+          key: terraform-${{ hashFiles('terraform/.terraform.lock.hcl') }}
+          restore-keys: terraform-
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: terraform init
+        run: terraform init -backend-config=backend.hcl
+
+      - name: terraform apply
+        run: terraform apply -auto-approve -input=false

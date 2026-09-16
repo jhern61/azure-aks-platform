@@ -45,7 +45,8 @@ module "aks" {
   location                   = azurerm_resource_group.this.location
   kubernetes_version         = var.kubernetes_version
   node_subnet_id             = module.network.node_subnet_id
-  system_node_count          = var.system_node_count
+  system_node_min            = var.system_node_min
+  system_node_max            = var.system_node_max
   system_node_size           = var.system_node_size
   user_node_min              = var.user_node_min
   user_node_max              = var.user_node_max

@@ -1,0 +1,17 @@
+# CODEOWNERS — every PR requires review from the platform team.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global fallback
+*                   @jhern61
+
+# Terraform infrastructure
+/terraform/         @jhern61
+
+# Kubernetes manifests
+/kubernetes/        @jhern61
+
+# CI/CD pipelines
+/.github/           @jhern61
+
+# Documentation
+/docs/              @jhern61

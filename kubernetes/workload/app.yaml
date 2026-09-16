@@ -27,6 +27,18 @@ spec:
         prometheus.io/port: "8080"
         prometheus.io/path: "/metrics"
     spec:
+      # Pin workloads to the user node pool, keeping the system pool free for
+      # critical addons (CoreDNS, metrics-server, etc.)
+      nodeSelector:
+        workload: general
+      # Spread pods across nodes to avoid co-location on a single host.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: web
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -52,6 +64,14 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          # startupProbe gives slow-starting containers up to 5 minutes before
+          # the liveness probe takes over, preventing premature kills on startup.
+          startupProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            failureThreshold: 30
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /metrics
@@ -79,6 +99,17 @@ spec:
     - name: metrics
       port: 8080
       targetPort: metrics
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web
+  namespace: demo
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: web
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

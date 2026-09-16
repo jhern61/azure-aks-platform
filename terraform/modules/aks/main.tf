@@ -1,3 +1,13 @@
+# User-assigned managed identity for the AKS control plane.
+# Decouples identity lifecycle from the cluster — allows RBAC grants before
+# cluster creation and survives cluster replacement without losing role assignments.
+resource "azurerm_user_assigned_identity" "aks" {
+  name                = "id-aks-${var.name}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  tags                = var.tags
+}
+
 resource "azurerm_kubernetes_cluster" "this" {
   name                = "aks-${var.name}"
   resource_group_name = var.resource_group_name
@@ -12,14 +22,19 @@ resource "azurerm_kubernetes_cluster" "this" {
   workload_identity_enabled         = true
 
   automatic_upgrade_channel = "patch"
+  node_os_upgrade_channel   = "NodeImage"
 
   default_node_pool {
-    name                 = "system"
-    vm_size              = var.system_node_size
-    node_count           = var.system_node_count
-    vnet_subnet_id       = var.node_subnet_id
-    orchestrator_version = var.kubernetes_version
+    name                         = "system"
+    vm_size                      = var.system_node_size
+    vnet_subnet_id               = var.node_subnet_id
+    orchestrator_version         = var.kubernetes_version
     only_critical_addons_enabled = true
+
+    # Autoscaling — minimum 2 nodes for HA on system-critical pods (CoreDNS etc.)
+    auto_scaling_enabled = true
+    min_count            = var.system_node_min
+    max_count            = var.system_node_max
 
     upgrade_settings {
       max_surge = "33%"
@@ -27,7 +42,8 @@ resource "azurerm_kubernetes_cluster" "this" {
   }
 
   identity {
-    type = "SystemAssigned"
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.aks.id]
   }
 
   azure_active_directory_role_based_access_control {
