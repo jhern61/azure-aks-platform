@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars and adjust. terraform.tfvars is gitignored.
+
+prefix      = "akssre"
+location    = "centralus"
+environment = "demo"
+
+# Autoscaling user pool bounds. Keep small for a demo.
+user_node_min = 1
+user_node_max = 4
+
+# Entra ID group(s) that should get cluster-admin via Azure RBAC.
+# admin_group_object_ids = ["00000000-0000-0000-0000-000000000000"]
+
+tags = {
+  cost_center = "portfolio"
+}

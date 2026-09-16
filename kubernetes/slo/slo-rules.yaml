@@ -1,0 +1,90 @@
+---
+# Service-level objectives expressed as Prometheus recording + alerting rules.
+#
+# SLO targets (see docs/slo.md for the reasoning):
+#   Availability: 99.9% of requests succeed        (30d error budget = 0.1%)
+#   Latency:      95% of requests served < 300ms   (30d)
+#
+# Alerting uses the multi-window, multi-burn-rate method from the Google SRE
+# workbook: a fast-burning budget pages, a slow burn opens a ticket.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: web-slo
+  namespace: demo
+  labels:
+    app: web
+    role: slo
+spec:
+  groups:
+    - name: web.sli.recording
+      interval: 30s
+      rules:
+        # Ratio of good (non-5xx) requests over multiple windows.
+        - record: job:http_requests:error_ratio5m
+          expr: |
+            sum(rate(http_requests_total{job="web",code=~"5.."}[5m]))
+              /
+            sum(rate(http_requests_total{job="web"}[5m]))
+        - record: job:http_requests:error_ratio1h
+          expr: |
+            sum(rate(http_requests_total{job="web",code=~"5.."}[1h]))
+              /
+            sum(rate(http_requests_total{job="web"}[1h]))
+        - record: job:http_requests:error_ratio6h
+          expr: |
+            sum(rate(http_requests_total{job="web",code=~"5.."}[6h]))
+              /
+            sum(rate(http_requests_total{job="web"}[6h]))
+        # Fraction of requests slower than the 300ms latency objective.
+        - record: job:http_latency:slow_ratio5m
+          expr: |
+            1 - (
+              sum(rate(http_request_duration_seconds_bucket{job="web",le="0.3"}[5m]))
+                /
+              sum(rate(http_request_duration_seconds_count{job="web"}[5m]))
+            )
+
+    - name: web.slo.alerts
+      rules:
+        # Availability: 99.9% -> budget 0.1%. Page on a fast burn (2% budget/hr).
+        - alert: WebAvailabilityBudgetBurnFast
+          expr: |
+            job:http_requests:error_ratio5m > (14.4 * 0.001)
+            and
+            job:http_requests:error_ratio1h > (14.4 * 0.001)
+          for: 2m
+          labels:
+            severity: page
+            slo: availability
+          annotations:
+            summary: "web is burning its availability budget fast"
+            description: "Error ratio over 5m and 1h exceeds 14.4x the 0.1% budget. At this rate the 30d budget is gone in ~2 days."
+            runbook: "docs/runbook.md#availability-burn"
+
+        # Availability: slow burn -> ticket, not a page.
+        - alert: WebAvailabilityBudgetBurnSlow
+          expr: |
+            job:http_requests:error_ratio6h > (6 * 0.001)
+            and
+            job:http_requests:error_ratio1h > (6 * 0.001)
+          for: 15m
+          labels:
+            severity: ticket
+            slo: availability
+          annotations:
+            summary: "web is slowly burning its availability budget"
+            description: "Error ratio over 6h and 1h exceeds 6x the 0.1% budget."
+            runbook: "docs/runbook.md#availability-burn"
+
+        # Latency: too many requests slower than 300ms.
+        - alert: WebLatencyObjectiveAtRisk
+          expr: job:http_latency:slow_ratio5m > 0.05
+          for: 10m
+          labels:
+            severity: ticket
+            slo: latency
+          annotations:
+            summary: "web latency objective at risk"
+            description: "More than 5% of requests are slower than 300ms over the last 5m."
+            runbook: "docs/runbook.md#latency-burn"

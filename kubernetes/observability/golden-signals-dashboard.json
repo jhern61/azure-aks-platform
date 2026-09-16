@@ -1,0 +1,66 @@
+{
+  "title": "web - Golden Signals",
+  "uid": "web-golden-signals",
+  "schemaVersion": 39,
+  "tags": ["slo", "aks", "web"],
+  "timezone": "browser",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Latency (p50 / p95 / p99)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"web\"}[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"web\"}[5m])) by (le))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"web\"}[5m])) by (le))", "legendFormat": "p99" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Traffic (req/s by code)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{job=\"web\"}[5m])) by (code)", "legendFormat": "{{code}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Error ratio vs 0.1% budget",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "job:http_requests:error_ratio5m", "legendFormat": "error ratio 5m" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.001 } ] }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Saturation (HPA replicas + CPU)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"web\"}", "legendFormat": "replicas" },
+        { "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"demo\",pod=~\"web-.*\"}[5m]))", "legendFormat": "cpu cores" }
+      ]
+    }
+  ]
+}

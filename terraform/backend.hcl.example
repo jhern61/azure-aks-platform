@@ -1,0 +1,7 @@
+# Copy to backend.hcl (gitignored) or let `make bootstrap` generate it.
+# Used via: terraform init -backend-config=backend.hcl
+resource_group_name  = "rg-akssre-tfstate"
+storage_account_name = "stakssretfstateXXXXXX"
+container_name       = "tfstate"
+key                  = "akssre.demo.tfstate"
+use_azuread_auth     = true

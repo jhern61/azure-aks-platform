@@ -1,0 +1,35 @@
+name: k8s-lint
+
+on:
+  pull_request:
+    paths:
+      - "kubernetes/**"
+      - ".github/workflows/k8s-lint.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: kubeconform + yaml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: yaml lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: kubernetes
+          config_data: |
+            extends: default
+            rules:
+              line-length: disable
+              document-start: disable
+
+      - name: kubeconform (schema validation)
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          ./kubeconform -strict -ignore-missing-schemas \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            kubernetes/
